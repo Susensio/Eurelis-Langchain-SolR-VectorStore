@@ -15,7 +15,7 @@ from .types import _results_to_docs, _results_to_docs_and_scores, Metadata
 from .solr_core import SolrCore
 
 logger = logging.getLogger()
-DEFAULT_K = 4  # Number of Documents to return.
+DEFAULT_K = 10000  # Number of Documents to return.
 
 
 class Solr(VectorStore):
@@ -158,7 +158,9 @@ class Solr(VectorStore):
         Returns:
             List[Document]: List of documents most similar to the query text.
         """
-        docs_and_scores = self.similarity_search_with_score(query, k, filter=filter)
+        logger.info(f"Searching for {query}")
+        docs_and_scores = self.similarity_search_with_score(query, k, filter=filter, **kwargs)
+        logger.info(f"Found {len(docs_and_scores)} documents")
         return [doc for doc, _ in docs_and_scores]
 
     def similarity_search_by_vector(
@@ -180,6 +182,7 @@ class Solr(VectorStore):
             embedding,
             n_results=k,
             where=filter,
+            **kwargs,
         )
         return _results_to_docs(results)
 
@@ -207,6 +210,7 @@ class Solr(VectorStore):
             embedding,
             n_results=k,
             where=filter,
+            **kwargs,
         )
         return _results_to_docs_and_scores(results)
 
@@ -230,12 +234,18 @@ class Solr(VectorStore):
             the query text and cosine distance in float for each.
             Lower score represents more similarity.
         """
+        logger.info(f"Searching for {query}")
+        logger.info(f"Filter: {filter}")
+        logger.info(f"Where document: {where_document}")
+        logger.info(f"K: {k}")
+        logger.info(f"kwargs: {kwargs}")
 
         query_embedding = self._embedding_function.embed_query(query)
         results = self._core.vector_search(
             query_embedding,
             n_results=k,
             where=filter,
+            **kwargs,
         )
 
         return _results_to_docs_and_scores(results)
@@ -271,6 +281,7 @@ class Solr(VectorStore):
             embedding,
             n_results=fetch_k,
             where=filter,
+            **kwargs,
         )
         mmr_selected = maximal_marginal_relevance(
             np.array(embedding, dtype=np.float32),
@@ -322,6 +333,7 @@ class Solr(VectorStore):
             fetch_k,
             lambda_mult=lambda_mult,
             filter=filter,
+            **kwargs,
         )
         return docs
 

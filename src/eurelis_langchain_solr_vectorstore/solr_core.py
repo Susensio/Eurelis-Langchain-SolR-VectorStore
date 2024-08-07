@@ -104,29 +104,44 @@ class SolrCore:
         vector: List[float],
         n_results: int = 4,
         where: Optional[dict[str, str]] = None,
+        **kwargs: Optional[dict[str, str]],
     ) -> Mapping[str, list[Any]]:
         url = self.get_handler_url(self._query_handler)
+        logger.debug(f"Solr search using url {url}")
 
         query_params = {
             "q": "{!knn f="
             + self._vector_field
             + " topK="
-            + str(n_results)
+            + str(1000)
             + "}"
             + str(vector),
             "fl": "*, score",
             "output": "json",
+            "rows": n_results,
         }
+
+        if boost := kwargs.pop("boost", None):
+            boost_query = f"{{!boost b={boost}}}"
+            query_params["q"] = f"{boost_query}{query_params['q']}"
+            _ = kwargs.pop("defType", None) # remove defType (edismax not working)
 
         if where:
             fq_values = []
             for field, value in where.items():
-                field_name = SolrCore.field_name_for_metadata_key(field, type(value))
-                if not field_name:
+                # If explicitly defined, use the field name as is
+                if field not in self._metadata_fields:
+                    field = SolrCore.field_name_for_metadata_key(field, type(value))
+                if not field:
                     continue
-                fq_values.append(f"{field_name}:{value}")
+                fq_values.append(f"{field}:{value}")
 
             query_params["fq"] = " AND ".join(fq_values)
+            logger.debug(f"Solr search using filter query {query_params['fq']}")
+
+        if kwargs:
+            query_params.update(kwargs)
+            logger.debug(f"Solr search using additional params {json.dumps(kwargs)}")
 
         params = {"params": query_params}
 
